@@ -1,0 +1,303 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+
+<html lang="ja">
+
+<head>
+<meta http-equiv="Content-type" content="text/html; charset=EUC-JP">
+<title>VME access library</title>
+<style type="text/css">
+h3 { color: green; text-decoration: underline }
+h4 { font-weight: bold }
+h5 { font-weight: normal; text-decoration: underline }
+</style>
+</head>
+
+<body bgcolor=#FFFFFF>
+
+<center>
+<h1>vmeslib</h1>
+</center>
+
+vmeslib は，VME デバイスヘの簡便で統一されたアクセスを提供するためのライブラリです．KEK が提供する vmelib と類似のインターフェースを持っており，vmelib からの移行が容易である一方，vmelib が持っていた多重オープンの問題を解決しています．KEK オンライングループと共同で開発されており，今後の VME アクセスライブラリの統一インターフェースを目指しています．
+
+<ul>
+  <li><a href="#overview">概要</a>
+  <li><a href="#reference">関数リファレンス</a>
+  <li><a href="#KEK-vmelib">KEK vmelib との相違</a>
+  <li><a href="#updates">更新履歴</a>
+</ul>
+
+<hr>
+
+<h3><a name="overview">概要</a></h3>
+vmeslib は以下の3つの機能を提供しています．
+<ul>
+  <li> 読み書き (データブロックの転送)
+  <li> メモリマッピング (モジュール上の領域へのポインタ経由のアクセス)
+  <li> 割り込み処理 (トリガハンドリングとか)
+</ul>
+
+<dl>
+  <dt> 読み書き
+  <dd> VME バスのモジュール上のメモリからのデータブロックの読み出しまたは書き込みを行います．データの転送には、通常の方法（Programmed I/O）に加えて，DMA および Non-Blocking DMA を指定できます．VME 読み書き関連の関数は以下のとおりです．
+  <p>
+  <ul>
+    <li> <tt>VMEIO* vme_open(int access_mode, int transfer_mode);</tt>
+    <li> <tt>int vme_close(VMEIO* handle);</tt>
+    <li> <tt>int vme_read(VMEIO* handle, off_t vme_address, void* buffer, size_t size);</tt>
+    <li> <tt>int vme_write(VMEIO* handle, off_t vme_address, const void* buffer, size_t size);</tt>
+  </ul>
+  <p>
+  まず <tt>vme_open()</tt> でモードを指定してオープンし，ハンドルを取得します．  これ以降，VME の読み書きに関する処理はこのハンドルを指定して行います．終了時には，<tt>vme_close()</tt> を呼んでリソースを開放します．
+  <p>
+  VME からのデータ読み出しは <tt>vme_read()</tt> で，データの書き込みは <tt>vme_write()</tt> で行います．VME のアクセスモード(アドレス幅とデータ幅)は，<tt>vme_open()</tt> の第1引数(<tt>access_mode</tt>)に以下のいずれかの値を渡して指定します．
+<pre>
+  VME_A16D16  VME_A16D32
+  VME_A24D16  VME_A24D32
+  VME_A32D16  VME_A32D32
+</pre>
+  データ転送モードは，<tt>vme_open()</tt> の第2引数(<tt>transfer_mode</tt>)に以下のいずれかの値を渡して指定します．
+<pre>
+  VME_NORMAL  (標準モード：Programmed I/O)
+  VME_DMA     (DMA モード)
+  VME_NBDMA   (Non-Blocking DMA モード)
+</pre>
+  DMA が利用できないデバイスで <tt>VME_DMA</tt> を指定した場合，または Non-Blocking DMA が利用できないデバイスで <tt>VME_NBDMA</tt> を指定した場合には，標準モード(<tt>VME_NORMAL</tt> の指定)となります．
+  <p>
+  関数の実行に失敗した場合，<tt>vme_open()</tt> は <tt>NULL</tt> を返し，それ以外の関数は <tt>-1</tt> を返します．いずれの場合も，大域変数 <tt>errno</tt> が設定されます．
+  <p>
+  プログラム例: <tt>dma-test.c</tt>
+  <p>
+  <dt> メモリマッピング
+  <dd> VME バスのモジュール上のアドレス領域を，プロセスのアドレス空間にマッピングします．これにより，モジュール上のメモリやレジスタに，通常のポインタを使ってアクセスできるようになります．メモリマッピング関連の関数は以下のとおりです．
+  <p>
+  <ul>
+    <li> <tt>VMEMAP* vme_mapopen(int access_mode, off_t vme_address, size_t size);</tt>
+    <li> <tt>int vme_mapclose(VMEMAP* handle);</tt>
+    <li> <tt>void* vme_mapbase(VMEMAP* handle);</tt>
+    <li> <tt>short* vme_word16(VMEMAP* handle, off_t offset);</tt>
+    <li> <tt>int* vme_word32(VMEMAP* handle, off_t offset);</tt>
+  </ul>
+  <p>
+  まず <tt>vme_mapopen()</tt> によりメモリマッピングを行い，ハンドルを取得します．これ以降，マッピングに関する処理はこのハンドルを指定して行います．
+  終了時には，<tt>vme_mapclose()</tt> を呼んでリソースを開放します．
+  <p>
+  マッピングされた領域の先頭をアクセスするポインタは，<tt>vme_mapbase()</tt> で取得できます．また，マッピングされた領域中の任意の 16 bit または 32 bit ワードは，<tt>vme_word16()</tt> または <tt>vme_word32()</tt> によりアクセスできます．もちろん，<tt>vme_mapbase()</tt> が返すアドレスに自分でオフセットを加算してポインタアクセスをしても構いません．VME のアクセスモード(アドレス幅とデータ幅)は，<tt>vme_open()</tt> の第1引数(<tt>access_mode</tt>)に以下のいずれかの値を渡して指定します．
+<pre>
+  VME_A16D16  VME_A16D32
+  VME_A24D16  VME_A24D32
+  VME_A32D16  VME_A32D32
+</pre>
+  <p>
+  関数の実行に失敗した場合，<tt>vme_mapopen()</tt> は <tt>NULL</tt> を返し，それ以外の関数は <tt>-1</tt> を返します．いずれの場合も，大域変数 <tt>errno</tt> が設定されます．
+  <p>
+  プログラム例: <tt>map-test.c</tt>
+  <p>
+  <dt> 割り込み処理
+  <dd> VME バスのモジュールが出す割り込み要求を処理します．割り込みの許可・不許可，割り込み待ち，割り込み要求状態の取得などが行えます．割り込み処理関連の関数は以下のとおりです．
+  <p>
+  <ul>
+    <li> <tt>VMEINT* vme_intopen(int interrupt_number, int vector);</tt>
+    <li> <tt>int vme_intclose(VMEINT* handle);</tt>
+    <li> <tt>int vme_intsetvectormask(VMEINT* handle, int vector_mask);</tt>
+    <li> <tt>int vme_intsetautodisable(VMEINT* handle);</tt>
+    <li> <tt>int vme_intenable(VMEINT* int_handle);</tt>
+    <li> <tt>int vme_intdisable(VMEINT* int_handle);</tt>
+    <li> <tt>int vme_intwait(VMEINT* int_handle, int timeout_sec);</tt>
+    <li> <tt>int vme_intnowait(VMEINT* int_handle);</tt>
+    <li> <tt>int vme_intcheck(VMEINT* int_handle);</tt>
+    <li> <tt>int vme_intclear(VMEINT* int_handle);</tt>
+  </ul>
+  <p>
+  まず <tt>vme_intopen()</tt> により割り込みを登録して，ハンドルを取得します．これ以降，割り込みに関する処理はこのハンドルを指定して行います．
+  終了時には，<tt>vme_intclose()</tt> を呼んでリソースを開放します．
+  <p>使用する割り込みベクタの幅がシステムのデフォルト(vmedrv では 16bit)と異なる場合，vme_intsetvectormask() によりベクタの有効ビットを指定してください．8 bit のベクタを使用する場合，vector_mask は 0x00ff となります．
+  <p>割り込みの許可・不許可は <tt>vme_intenable()</tt> および <tt>vme_intdisable()</tt> で行います．割り込みは，<tt>vme_intwait()</tt> または <tt>vme_intnowait()</tt> により取得できます．<tt>vme_intwait()</tt> は割り込み発生またはタイムアウトまで実行をブロックしますが，<tt>vme_intnowait()</tt> はブロックしません．<tt>vme_intcheck()</tt> によりブロックせずに割り込み状態を取得できます．<tt>vme_intcheck()</tt> により割り込み要求が検出された場合は，<tt>vme_intwait()</tt> または <tt>vme_intnowait()</tt> を呼び出してその割り込みを処理するか，<tt>int vme_intclear()</tt> によりクリアするかのいずれかが必要です．
+  <p>使用するモジュールが割り込みサイクル終了後に割り込み要求を自動で解除しない場合，繰り返し割り込み処理ルーチンが呼ばれるのを避けるために，vme_intsetautodisable() を使用して割り込みの自動不許可を設定してください．この場合，割り込みを取得するたびに割り込み不許可になるので，次の割り込み待ちをする前に毎回 vme_intenable() を呼び出してください．
+  <p>
+  関数の実行に失敗した場合，<tt>vme_intopen()</tt> は <tt>NULL</tt> を返し，それ以外の関数は <tt>-1</tt> を返します．いずれの場合も，大域変数 <tt>errno</tt> が設定されます．
+  <p>
+  プログラム例 1: <tt>intwait-test.c</tt> <br>
+  プログラム例 2: <tt>intnowait-test.c</tt>
+  <p>
+</dl>
+
+
+<ul>
+  <li> vmeslib を使用するには，ソースで <tt>vmeslib.h</tt> をインクルードし，<tt>libvmeslib.a</tt> をリンクする必要があります．
+  <li> 将来の変更の際のソースコードの互換性を保つため，ハンドル構造体(VMEIO, VMEMAP, VMEINT)の内部に直接アクセスすることは避けてください．
+</ul>
+
+
+<h3><a name="reference">関数リファレンス</a></h3>
+<ul>
+  <li> 読み書き関連
+<dl>
+  <dt> <tt>VMEIO* vme_open(int access_mode, int transfer_mode)</tt>
+  <dd> read() および write() を行うためにドライバをオープンし，ハンドルを返します．
+  <p>
+  引数 <tt>access_mode</tt> は，VME にアクセスする際のアドレス幅とデータ幅を指定するもので，以下のいずれかの値をとります．
+  <blockquote><table border="0" cellpadding="3">
+    <tr><td><tt>VME_A16D16</tt></td><td>アドレス16bit, データ16bit</td></tr>
+    <tr><td><tt>VME_A16D32</tt></td><td>アドレス16bit, データ32bit</td></tr>
+    <tr><td><tt>VME_A24D16</tt></td><td>アドレス24bit, データ16bit</td></tr>
+    <tr><td><tt>VME_A24D32</tt></td><td>アドレス24bit, データ32bit</td></tr>
+    <tr><td><tt>VME_A32D16</tt></td><td>アドレス32bit, データ16bit</td></tr>
+    <td><tt>VME_A32D32</tt></td><td>アドレス32bit, データ32bit</td></tr>
+  </table></blockquote>
+  <p>
+  引数 <tt>transfer_mode</tt> は，read() または write() でデータを転送する際の転送方法を指定するもので，以下のいずれかの値をとります．
+  <blockquote><table border="0" cellpadding="3">
+    <tr><td><tt>VME_NORMAL</tt></td><td>標準モード (Programmed I/O)</td></tr>
+    <tr><td><tt>VME_DMA</tt></td><td>DMAモード</td></tr>
+    <tr><td><tt>VME_NBDMA</tt></td><td>Non-Blocking DMAモード</td></tr>
+  </table></blockquote>
+  <p>
+  <tt>vme_open()</tt> は，成功するとハンドルのポインタを返します．失敗の場合は <tt>NULL</tt> を返して大域変数 <tt>errno</tt> を設定します．
+  <p>
+  <dt> <tt>int vme_close(VMEIO* handle)</tt>
+  <dd> ドライバをクローズして，リソースを開放します．
+  <p>
+  <tt>vme_close()</tt> は，成功すると <tt>0</tt> を返します．失敗の場合は <tt>-1</tt> を返して大域変数 <tt>errno</tt> を設定します．
+  <p>
+  <dt> <tt>int vme_read(VMEIO* handle, off_t vme_address, void* buffer, size_t count)</tt>
+  <dd> <tt>vme_address</tt> に指定された VME 上のアドレスから，<tt>count</tt> バイトのデータを読み出して，<tt>buffer</tt> が指す領域に格納します．1ワードの読み出しごとに VME の読み出しアドレスをインクリメントしていくので，最後のワードが読み出される VME アドレスは <tt>vme_address+count-WORD_SIZE</tt> (<tt>WORD_SIZE</tt>は 2 (16bitモード) または 4(32bitモード)) です．
+  <p>
+  <tt>vme_read()</tt> は，成功すると読み出したデータのサイズを返します．失敗の場合は <tt>-1</tt> を返して大域変数 <tt>errno</tt> を設定します．
+  <p>
+  <dt> <tt>int vme_write(VMEIO* handle, off_t vme_address, const void* buffer, size_t count)</tt>
+  <dd> <tt>buffer</tt> が指す領域に格納されている<tt>count</tt> バイトのデータを <tt>vme_address</tt> に指定された VME 上のアドレスへ書き込みます．
+1ワードの書き込みごとに VME の読み出しアドレスをインクリメントしていくので，最後のワードが書き込まれる VME アドレスは <tt>vme_address+count-WORD_SIZE</tt> (<tt>WORD_SIZE</tt>は 2 (16bitモード) または 4(32bitモード)) です．
+  <p>
+  <tt>vme_write()</tt> は，成功すると書き込んだデータのサイズを返します．失敗の場合は <tt>-1</tt> を返して大域変数 <tt>errno</tt> を設定します．
+</dl>
+  <p>
+  <li> メモリマッピング関連
+<dl>
+  <dt> <tt>VMEMAP* vme_mapopen(int access_mode, off_t vme_address, size_t size)</tt>
+  <dd> <tt>vme_address</tt> から始まる <tt>size</tt> バイトの VME 上の領域をプロセスのアドレス空間にマッピングし，その領域にアクセスするためのハンドルを返します.
+  <p>
+  引数 <tt>access_mode</tt> は，VME にアクセスする際のアドレス幅とデータ幅を指定するもので，以下のいずれかの値をとります．
+  <blockquote><table border="0" cellpadding="3">
+    <tr><td><tt>VME_A16D16</tt></td><td>アドレス16bit, データ16bit</td></tr>
+    <tr><td><tt>VME_A16D32</tt></td><td>アドレス16bit, データ32bit</td></tr>
+    <tr><td><tt>VME_A24D16</tt></td><td>アドレス24bit, データ16bit</td></tr>
+    <tr><td><tt>VME_A24D32</tt></td><td>アドレス24bit, データ32bit</td></tr>
+    <tr><td><tt>VME_A32D16</tt></td><td>アドレス32bit, データ16bit</td></tr>
+    <td><tt>VME_A32D32</tt></td><td>アドレス32bit, データ32bit</td></tr>
+  </table></blockquote>
+  <p>
+  <tt>vme_mapopen()</tt> は，成功するとハンドルのポインタを返します．失敗の場合は <tt>NULL</tt> を返して大域変数 <tt>errno</tt> を設定します．
+  <p>
+  <dt> <tt>int vme_mapclose(VMEMAP* map_handle)</tt>
+  <dd> <tt>vme_mapopen()</tt> により作成されたマッピングを消去し，リソースを開放します．
+  <p>
+  <tt>vme_mapclose()</tt> は，成功すると <tt>0</tt> を返します．失敗の場合は <tt>-1</tt> を返して大域変数 <tt>errno</tt> を設定します．
+  <p>
+  <dt> <tt>void* vme_mapbase(VMEMAP* map_handle)</tt>
+  <dd> マッピングされた領域の先頭を指すポインタを返します．
+  <p>
+  <dt> <tt>short* vme_word16(VMEMAP* map_handle, off_t offset)</tt>
+  <dd> マッピングされた領域中の先頭から <tt>offset</tt> バイト目の 16bit ワードを指すポインタを返します．
+  <p>
+  <dt> <tt>int* vme_word32(VMEMAP* map_handle, off_t offset)</tt>
+  <dd> マッピングされた領域中の先頭から <tt>offset</tt> バイト目の 32bit ワードを指すポインタを返します．
+  <p>
+  <dt> <tt>int vme_mapcheck(VMEMAP* map_handle, off_t offset)</tt>
+</dl>
+  <p>
+  <li> 割り込み処理関連
+<dl>
+  <dt> <tt>VMEINT* vme_intopen(int intrrupt_number, int vector)</tt>
+  <dd> 引数に指定された割り込み番号とベクタの割り込みを登録し，ハンドルを返します．<tt>interrupt_number</tt> の意味はシステム(OSやデバイスドライバ)によって異なりますが，一般的には IRQ を直接指定します．一部のシステムでは，どこかの設定ファイルに記述されたテーブルのエントリ番号を記述するようになっているものもあるようです．ちなみに，vmedrv では IRQ を直接指定します．
+  <p> <tt>vector</tt> 引数の値も，下位のシステムに直接渡されます．vmedrv のように，VME の割り込みベクタ値をそのまま指定するシステムの場合，<tt>vme_intsetvectormask()</tt> 関数によりベクタの有効ビットを指定してください．
+  <p>
+  <tt>vme_intopen()</tt> は，成功するとハンドラのポインタを返します．失敗の場合は <tt>NULL</tt> を返して大域変数 <tt>errno</tt> を設定します．
+  <p>
+  <dt> <tt>int vme_intclose(VMEINT* int_handle)</tt>
+  <dd> 登録された割り込みを削除し，リソースを開放します．
+  <p>
+  <tt>vme_intclose()</tt> は，成功すると<tt>0</tt>を返します．失敗の場合は <tt>-1</tt> を返して大域変数 <tt>errno</tt> を設定します．
+  <p>
+  <dt> <tt>int vme_intsetvectormask(VMEINT* handle, int vector_mask)</tt>
+  <dd> <tt>vme_intopen()</tt> 関数で指定した <tt>vector</tt> の有効ビットマスクを指定します．例えば，8bit のベクタを使用する場合，<tt>vector_mask</tt> に 0x00ff を指定します．
+  <p>
+  <tt>vme_intsetvectormask()</tt> は，成功すると<tt>0</tt>を返します．失敗の場合は <tt>-1</tt> を返して大域変数 <tt>errno</tt> を設定します．
+  <p>
+  <dt> <tt>int vme_intsetautodisable(VMEINT* handle)</tt>
+  <dd> 割り込みサイクル終了時に自動で割り込み不許可を設定するようにします．これは，割り込みサイクル終了時に割り込み要求を自動でクリアしないようなモジュールを使用する場合に，繰り返し割り込み処理ルーチンが呼ばれてシステムが制御不能になるのを避けるために使用します．
+  <p>
+  <tt>vme_intsetautodisable()</tt> は，成功すると<tt>0</tt>を返します．失敗の場合は <tt>-1</tt> を返して大域変数 <tt>errno</tt> を設定します．
+  <p>
+  <dt> <tt>int vme_intenable(VMEINT* int_handle)</tt>
+  <dd> 割り込みを許可し，割り込みの処理を開始します．ここでの許可はドライバ，OS，VME コントローラ に対しての許可で，モジュール自体に対する許可ではないことに注意してください．割り込みの許可には，通常，モジュール上のレジスタの操作が必要です．
+  <p>
+  <tt>vme_intenable()</tt> は，成功すると<tt>0</tt>を返します．失敗の場合は <tt>-1</tt> を返して大域変数 <tt>errno</tt> を設定します．
+  <p>
+  <dt> <tt>int vme_intdisable(VMEINT* int_handle)</tt>
+  <dd> 割り込みを禁止し，割り込みの処理を停止します．  <p>
+  <tt>vme_intdisable()</tt> は，成功すると<tt>0</tt>を返します．失敗の場合は <tt>-1</tt> を返して大域変数 <tt>errno</tt> を設定します．
+  <p>
+  <dt> <tt>int vme_intwait(VMEINT* int_handle, int timeout_sec)</tt>
+  <dd> <tt>timeout_sec</tt> に指定された時間を上限として，割り込みを待ちます．<tt>vme_intwait()</tt> の呼び出し前に割り込みが発生していたら，<tt>vme_intwait()</tt> はただちにリターンします．割り込みを取得して <tt>vme_intwait()</tt> からリターンした場合はその割り込みは「処理済み」となり，次の <tt>vme_intwait()</tt> (と <tt>vme_intnowait()</tt>)では処理されません．ただし，これはモジュールの割り込みのクリアとは異なるので注意してください．モジュールの割り込みのクリアにはモジュール上のレジスタ操作が必要なことがあります．
+  <p>
+  引数 <tt>timeout_sec</tt> に 0 を渡すと，タイムアウトの設定値は無限となります．
+  <p>
+  <tt>vme_intwait()</tt> は，割り込みを取得すると，正の整数を返します．これは割り込み要求の数に対応することもありますが，保証されていません．タイムアウトでは <tt>0</tt> を返します．失敗の場合(VME割り込み待ち中にシグナル割り込みを受けた等)は <tt>-1</tt> を返して大域変数 <tt>errno</tt> を設定します．ちなみに，シグナル割り込みを受けた場合の <tt>errno</tt> の値は <tt>EINTR</tt> です．
+  <p>
+  <dt> <tt>int vme_intnowait(VMEINT* int_handle)</tt>
+  <dd> 実行をブロックせずに割り込みを取得します．実行をブロックしないことを除いて <tt>vme_intwait()</tt> と同じです．<tt>vme_intnowait()</tt> の呼び出し前に割り込みが発生していたら，<tt>vme_intnowait()</tt> はただちにリターンします．割り込みが発生していなければ，茄にもせずにただちにリターンします．割り込みを取得して <tt>vme_intnowait()</tt> からリターンした場合はその割り込みは「処理済み」となり，次の <tt>vme_intnowait()</tt> (と<tt>vme_intwait()</tt>)では処理されません．ただし，これはモジュールの割り込みのクリアとは異なるので注意してください．モジュールの割り込みのクリアにはモジュール上のレジスタ操作が必要なことがあります．
+  <p>
+  <tt>vme_intnowait()</tt> は，割り込みを取得すると，正の整数を返します．これは割り込み要求の数に対応することもありますが，保証されていません．<tt>vme_intnowait()</tt>呼び出しまでに割り込みが発生していなければ <tt>0</tt> を返します．失敗の場合は <tt>-1</tt> を返して大域変数 <tt>errno</tt> を設定します．
+  <p>
+  <dt> <tt>int vme_intcheck(VMEINT* int_handle)</tt>
+  <dd> 実行をブロックせずに割り込み状態を取得します．割り込み要求があっても，それは処理されません．割り込みが処理されないことを除いて <tt>vme_intnowait()</tt> と同じです．
+  <p>
+  <tt>vme_intcheck()</tt> は，未処理の割り込み要求があれば，正の整数を返します．これは割り込み要求の数に対応することもありますが，保証されていません．未処理の割り込み要求がなければ <tt>0</tt> を返します．失敗の場合は <tt>-1</tt> を返して大域変数 <tt>errno</tt> を設定します．
+  <p>
+  <dt> <tt>int vme_intclear(VMEINT* int_handle)</tt>
+  <dd> 割り込み要求を「処理済み」としてクリアします．処理済みの割り込み要求は，これ以降の <tt>vme_intwait()</tt>，<tt>vme_intnowait()</tt> および <tt>vme_intcheck()</tt> では処理されなくなります．ただし，これはモジュールの割り込みのクリアとは異なるので注意してください．モジュールの割り込みのクリアにはモジュール上のレジスタ操作が必要なことがあります．
+  <p>
+  <tt>vme_intclear()</tt> は，成功の場合 <tt>0</tt> を返します．失敗の場合は <tt>-1</tt> を返して大域変数 <tt>errno</tt> を設定します．</dl>
+  </dl>
+  <li> その他
+  <dl>
+  <dt> <tt>int vme_tryget(int access_mode, off_t vme_address)</tt>
+  <dd> 引数 <tt>access_mode</tt> に指定されたアクセスモードで，引数 <tt>vme_address</tt> に指定されたアドレスからの1ワードの読み込みを行い，エラー状態をチェックします．他の VME 関数と違い，読み出しを行ったアドレスから正しく値が返されているか(すなわち，モジュールが正しく応答しているか)のチェックを行います．他の VME 関数では単に不定の値(普通は<tt>0xffff</tt>とか)を返してくるような場面でも，<tt>vme_tryget()</tt> はエラーを報告します．
+  <p>
+<tt>vme_tryget()</tt> は，この中でオープン，読み出し，クローズの全てを行うのでハンドルは必要ありません．ただし，この関数の中で行う処理が多いので，頻繁な呼び出しには向きません．最初のチェックに使うことを想定しています．
+  <p>
+  <tt>vme_tryget()</tt> は，読み込みに成功すれば <tt>0</tt> を返します．失敗の場合は <tt>-1</tt> を返して大域変数 <tt>errno</tt> を設定します．
+  </dl>
+</ul>
+
+
+<h3><a name="KEK-vmelib">KEK vmelib との相違</a></h3>
+<ul>
+  <li> vmeslib では，基本的に全てハンドル経由のアクセス．KEK vmelib では，ハンドル(に相当するもの)が内部で扱われているため，多重オープンに対応できない．
+  <li> vmeslib では，<tt>vme_XXXopen()</tt> 以外の関数の失敗時の戻り値が -1 に統一されている．KEK vmelib では，失敗時に <tt>errno</tt> を返すが，正常時に正の値を返す関数の場合エラーの判定が難しい．
+  <li> vmeslib では，<tt>vme_intwait()</tt> のタイムアウトはエラーとせず，戻り値に 0 を返すようにした．
+  <li> KEK vmelib にあった，アクセスエラー時にアボートする <tt>vme_mapprobe()</tt> 関数を廃止．かわりに，戻り値でエラーを伝える <tt>vme_tryget()</tt> 関数を提供．
+</ul>
+
+
+<h3><a name="updates">更新履歴</a></h3>
+<dl>
+  <dt>2010年7月21日
+  <dd>0x80000000 以上のアドレスへアクセスした際にエラーになる不具合を修正
+  <dd> (細見さん(東北大)によるバグフィクスです．ありがとうございました)
+  <dt>2010年2月27日
+  <dd>vme_intsetvectormask() と vme_intsetautodisable() を追加
+  <dd> (細見さん(東北大)の提案・試験・バグフィクスによります．ありがとうございました)
+  <dt>2005年10月27日
+  <dd>Version 1.0
+  <p>
+</dl>
+
+
+<hr>
+Edited by: Enomoto Sanshiro<br>
+
+
+</body>
+</html>
