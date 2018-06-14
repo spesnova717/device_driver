@@ -235,27 +235,6 @@ static int pci_probe (struct pci_dev *pdev, const struct pci_device_id *id) {
 
         pci_set_master(pdev);   //For DMA.
 
-        //int vval = 0;
-        //int ii;
-        /*
-        for(ii=0;ii<16;ii++){
-            iowrite32(0x71771777,dev_data->mmio_addr + ii*4);
-            vval = ioread32(dev_data->mmio_addr + ii*4);
-            tprintk("%x\n",vval);
-        }
-        tprintk("=========\n");
-        iowrite32(0x12345666,dev_data->mmio_addr);
-        for(ii=0;ii<16;ii++){
-            vval = ioread32(dev_data->mmio_addr + ii*4);
-            tprintk("%x\n",vval);
-        
-        }
-*/
-/*//以下のプログラムでカーネルパニックさせる
-        iowrite32(0x12345666,dev_data->mmio_addr + 2097152);
-        vval = ioread32(dev_data->mmio_addr + 2097152);
-        tprintk("%x\n",vval);
-*/
         return 0;
 
 error:
