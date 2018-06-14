@@ -1,0 +1,1 @@
+cmd_/root/device_driver/MTE/vc707/driver.ko := ld -r -m elf_x86_64 -T ./scripts/module-common.lds --build-id  -o /root/device_driver/MTE/vc707/driver.ko /root/device_driver/MTE/vc707/driver.o /root/device_driver/MTE/vc707/driver.mod.o
