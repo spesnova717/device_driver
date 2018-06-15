@@ -1,3 +1,21 @@
+#include <iostream>
+
+#include <random>
+#include <chrono>
+#include <vector>
+
+//Use Linux file functions for the device
+#include <fcntl.h>
+#include <unistd.h> // opening flags 
+#include <sys/time.h>
+#include <sys/types.h>
+
+#define DATA_SIZE 4*1048576/4*2
+
+using std::cout;
+using std::endl;
+using std::vector;
+
 // test program for pci device
 #include <stdio.h>
 #include <stdlib.h>
@@ -74,6 +92,7 @@ void mmio_test(int fd)
 	FILE *fp;
 	unsigned int amount_data;
 	int *transfer_data;
+	int data;
 	unsigned int *receive_data;
 	int write_data;
 	
@@ -81,17 +100,30 @@ void mmio_test(int fd)
     transfer_data = (int *)malloc(sizeof(int) * amount_data);
     receive_data = (unsigned int *)malloc(sizeof(unsigned int) * amount_data);
 	
-    for (i=0; i<amount_data; i++){
+/*     for (i=0; i<amount_data; i++){
       transfer_data[i]=0x50000000;
-    }
+    } */
+	
+    //Create a random vector of half the length of the block RAM
+    vector<uint32_t> testVec;
+	data = 0x11111111;
+	
+    for (size_t ct=0; ct<amount_data; ct++){
+    	testVec.push_back(data);
+    }	
 	
 	IOCmd_t iocmd = {0,0,0,0};
-	iocmd.userAddr = transfer_data;
+	iocmd.devAddr = 0;
+	iocmd.userAddr = testVec.data();
 	
-	write(fd, &iocmd, sizeof(transfer_data));
+	write(fd, &iocmd, testVec.size());
 	
-	iocmd.userAddr = receive_data;
-	read( fd, &iocmd, sizeof(receive_data));
+	vector<uint32_t> testVec2;
+    testVec2.resize(amount_data);
+    iocmd.userAddr = testVec2.data();	
+	
+	read(fd, &iocmd, testVec2.size());
+
 	
 	
    
@@ -102,8 +134,8 @@ void mmio_test(int fd)
     //start_time_read = gettimeofday_sec();
     //end_time_read = gettimeofday_sec();
     //printf("---Read Finish---\n");
-      for(i=0;i<amount_data; i++){
-        printf("data = receive_data[%d] = %x\n",i,receive_data[i]);
+      for(i=0;i<10; i++){
+        printf("data = receive_data[%d] = %x\n",i,testVec2[i]);
       }
     //temporary_write = amount_data * 4 / (end_time_write - start_time_write) / 1000000;
     //temporary_read = amount_data * 4 / (end_time_read - start_time_read) / 1000000;
@@ -126,11 +158,11 @@ int main(int argc, char const* argv[])
 	double write;
 	double read_bps;
 	double write_bps;
-	read = (end_time_read - start_time_read);
-	write = (end_time_write - start_time_write);
+	//read = (end_time_read - start_time_read);
+	//write = (end_time_write - start_time_write);
 
-	read_bps = (1000000*8/read/1000000);
-	write_bps = (1000000*8/write/1000000);
+	//read_bps = (1000000*8/read/1000000);
+	//write_bps = (1000000*8/write/1000000);
 	//printf("read time = %lf[sec]\n",read);
 	//printf("write time = %lf[sec]\n",write);
 	//printf("read = %lf[Mbps]\n",read_bps);
