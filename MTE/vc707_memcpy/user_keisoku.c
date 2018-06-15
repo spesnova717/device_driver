@@ -85,64 +85,53 @@ void close_device(int fd)
 
 void mmio_test(int fd)
 {
-	int i;
+	int i,j;
     int loop;
 	double temporary_write;
 	double temporary_read;
 	FILE *fp;
-	unsigned int amount_data;
+	unsigned int amount_data_byte;
 	int *transfer_data;
 	int data;
 	unsigned int *receive_data;
 	int write_data;
 	
-    amount_data = 1;
-    transfer_data = (int *)malloc(sizeof(int) * amount_data);
-    receive_data = (unsigned int *)malloc(sizeof(unsigned int) * amount_data);
-	
-/*     for (i=0; i<amount_data; i++){
-      transfer_data[i]=0x50000000;
-    } */
+    amount_data_byte = 65536*4;
 	
     //Create a random vector of half the length of the block RAM
     vector<uint32_t> testVec;
-	data = 0x11111111;
+	data = 0x11111112;
 	
-    for (size_t ct=0; ct<amount_data; ct++){
+    for (size_t ct=0; ct<amount_data_byte; ct++){
     	testVec.push_back(data);
     }	
-	
+for(j=0;j<10;j++){	
 	IOCmd_t iocmd = {0,0,0,0};
 	iocmd.devAddr = 0;
 	iocmd.userAddr = testVec.data();
 	
+	start_time_write = gettimeofday_sec();
 	write(fd, &iocmd, testVec.size());
+	end_time_write = gettimeofday_sec();
 	
 	vector<uint32_t> testVec2;
-    testVec2.resize(amount_data);
+    testVec2.resize(amount_data_byte);
     iocmd.userAddr = testVec2.data();	
-	
+
+	start_time_read = gettimeofday_sec();
 	read(fd, &iocmd, testVec2.size());
-
-	
-	
+	end_time_read = gettimeofday_sec();	
    
-    //start_time_write = gettimeofday_sec();
-    //end_time_write = gettimeofday_sec();
-    //printf("---Write Finish---\n");
-
-    //start_time_read = gettimeofday_sec();
-    //end_time_read = gettimeofday_sec();
-    //printf("---Read Finish---\n");
-      for(i=0;i<10; i++){
-        printf("data = receive_data[%d] = %x\n",i,testVec2[i]);
-      }
-    //temporary_write = amount_data * 4 / (end_time_write - start_time_write) / 1000000;
-    //temporary_read = amount_data * 4 / (end_time_read - start_time_read) / 1000000;
+    for(i=0;i<amount_data_byte/4; i++){
+		//printf("data = receive_data[%d] = %x\n",i,testVec2[i]);
+    }
+	
+    temporary_write = amount_data_byte / (end_time_write - start_time_write) / 1000000;
+    temporary_read = amount_data_byte  / (end_time_read - start_time_read) / 1000000;
     
-    //printf("Write = %8lf[MB/s]\n",temporary_write);
-    //printf("Read  =  %8lf[MB/s]\n",temporary_read);
-		fclose(fp);
+    printf("Write = %8lf[MB/s]\n",temporary_write);
+    printf("Read  =  %8lf[MB/s]\n",temporary_read);
+}
 }
 
 int main(int argc, char const* argv[])
@@ -151,23 +140,7 @@ int main(int argc, char const* argv[])
 
 	fd = open_device(DEVFILE);
 	mmio_test(fd);
-
-	close_device(fd);
-	
-	double read;
-	double write;
-	double read_bps;
-	double write_bps;
-	//read = (end_time_read - start_time_read);
-	//write = (end_time_write - start_time_write);
-
-	//read_bps = (1000000*8/read/1000000);
-	//write_bps = (1000000*8/write/1000000);
-	//printf("read time = %lf[sec]\n",read);
-	//printf("write time = %lf[sec]\n",write);
-	//printf("read = %lf[Mbps]\n",read_bps);
-	//printf("write = %lf[Mbps]\n",write_bps);	
-	//printf("%lf %lf\n",read_bps,write_bps);
+	close_device(fd);	
 	
 	return 0;
 }
