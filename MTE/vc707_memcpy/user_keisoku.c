@@ -96,7 +96,7 @@ void mmio_test(int fd)
 	unsigned int *receive_data;
 	int write_data;
 	
-    amount_data_byte = 65536*4;
+    amount_data_byte = 4100;
 	
     //Create a random vector of half the length of the block RAM
     vector<uint32_t> testVec;
@@ -105,7 +105,7 @@ void mmio_test(int fd)
     for (size_t ct=0; ct<amount_data_byte; ct++){
     	testVec.push_back(data);
     }	
-for(j=0;j<10;j++){	
+for(j=0;j<1;j++){	
 	IOCmd_t iocmd = {0,0,0,0};
 	iocmd.devAddr = 0;
 	iocmd.userAddr = testVec.data();

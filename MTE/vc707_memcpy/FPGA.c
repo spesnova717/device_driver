@@ -76,12 +76,14 @@ ssize_t rw_dispatcher(struct file *filePtr, char __user *buf, size_t count, bool
 		if (rwFlag) {
 			//First read from device into kernel memory 
 			memcpy_fromio(devInfo->buffer, startAddr + bytesDone, bytesToTransfer);
+      printk(KERN_INFO "[FPGA] count_read.\n");
 			//Then into user space
 			copy_to_user(iocmd.userAddr + bytesDone, devInfo->buffer, bytesToTransfer);
 		}
 		else{
 			//First copy from user to buffer
 			copy_from_user(devInfo->buffer, iocmd.userAddr + bytesDone, bytesToTransfer);
+      printk(KERN_INFO "[FPGA] count_write.\n");
 			//Then into the device
 			memcpy_toio(startAddr + bytesDone, devInfo->buffer, bytesToTransfer);
 		}
