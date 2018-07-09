@@ -45,6 +45,7 @@ struct IOCmd_t {
 	void * userAddr; // virtual address in user space to read/write from
 };
 
+//change branch issue1
 ssize_t rw_dispatcher(struct file *filePtr, char __user *buf, size_t count, bool rwFlag){
 
 	//Read the command from the buffer
