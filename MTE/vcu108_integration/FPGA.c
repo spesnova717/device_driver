@@ -360,7 +360,8 @@ int start_read;
 int start_write;
 int end_read;
 int end_write;
-
+int val[2048];
+int val_res[2048];
 static int probe(struct pci_dev *dev, const struct pci_device_id *id) {
 		/*
 		From : http://www.makelinux.net/ldd3/chp-12-sect-1
@@ -412,18 +413,21 @@ static int probe(struct pci_dev *dev, const struct pci_device_id *id) {
 		//TODO: proper error catching and memory releasing
 		sema_init(&devInfo->sem, 1);
 
-		int val[2048];
-		int val_res[2048];
+		//int val[2048];
+		//int val_res[2048];
 		int t;
 		/*
-     * Kenel Dump
-    for(t=0;t<2000;t++){
+    // * Kenel Dump
+    for(t=0;t<1024;t++){
 			val[t] = 0x12345678;
       val_res[t] = 0;
 		}
-*/
+    */
+
+    val[1023] = 0x99999999;
     start_write = print_timestamp();
 		memcpy_toio(devInfo->bar[0], val, 4096);
+    /*
     memcpy_toio(devInfo->bar[0], val, 4096);
     memcpy_toio(devInfo->bar[0], val, 4096);
     memcpy_toio(devInfo->bar[0], val, 4096);
@@ -439,10 +443,13 @@ static int probe(struct pci_dev *dev, const struct pci_device_id *id) {
     memcpy_toio(devInfo->bar[0], val, 4096);
     memcpy_toio(devInfo->bar[0], val, 4096);
     memcpy_toio(devInfo->bar[0], val, 4096);
+    */
+    wmb();
     end_write = print_timestamp();
 
     start_read = print_timestamp();
 		memcpy_fromio(val_res, devInfo->bar[0], 4096);
+    /*
     memcpy_fromio(val_res, devInfo->bar[0], 4096);
     memcpy_fromio(val_res, devInfo->bar[0], 4096);
     memcpy_fromio(val_res, devInfo->bar[0], 4096);
@@ -458,11 +465,31 @@ static int probe(struct pci_dev *dev, const struct pci_device_id *id) {
     memcpy_fromio(val_res, devInfo->bar[0], 4096);
     memcpy_fromio(val_res, devInfo->bar[0], 4096);
     memcpy_fromio(val_res, devInfo->bar[0], 4096);
+    */
+    rmb();
     end_read = print_timestamp();
 
-		//printk("memcpy_fromio = 0x%lx\n",val_res[1024]);
+		printk("memcpy_fromio = 0x%lx\n",val_res[1023]);
     printk("write = %d\n",end_write - start_write);
     printk("read = %d\n",end_read - start_read);
+
+    val[1023] = 0x11111111;
+    start_write = print_timestamp();
+    for (t = 0; t < 1024; t++) {
+      iowrite32(val[t],devInfo->bar[0] + t*4);
+    
+    }
+    end_write = print_timestamp();
+
+    start_read = print_timestamp();
+      for (t = 0; t < 1024; t++) {
+        val_res[t] = ioread32(devInfo->bar[0] + t*4);
+      }
+    end_read = print_timestamp();
+    printk("io = 0x%lx\n",val_res[1023]);
+    printk("write = %d\n",end_write - start_write);
+    printk("read = %d\n",end_read - start_read);
+
 		return 0;
 
 }

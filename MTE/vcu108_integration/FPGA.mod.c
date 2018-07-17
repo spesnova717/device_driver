@@ -23,6 +23,8 @@ __attribute__((section("__versions"))) = {
 	{ 0x71de9b3f, __VMLINUX_SYMBOL_STR(_copy_to_user) },
 	{ 0x69acdf38, __VMLINUX_SYMBOL_STR(memcpy) },
 	{ 0x77e2f33, __VMLINUX_SYMBOL_STR(_copy_from_user) },
+	{ 0xe484e35f, __VMLINUX_SYMBOL_STR(ioread32) },
+	{ 0x436c2179, __VMLINUX_SYMBOL_STR(iowrite32) },
 	{ 0x211f68f1, __VMLINUX_SYMBOL_STR(getnstimeofday64) },
 	{ 0x8055d058, __VMLINUX_SYMBOL_STR(pci_iomap) },
 	{ 0xc3fc2f, __VMLINUX_SYMBOL_STR(pci_request_regions) },
@@ -56,7 +58,7 @@ __attribute__((section(".modinfo"))) =
 
 MODULE_ALIAS("pci:v000010EEd00008038sv*sd*bc*sc*i*");
 
-MODULE_INFO(srcversion, "AC4F13084485943D4260A26");
+MODULE_INFO(srcversion, "C570DFE74C0ABB9D57AD2D9");
 MODULE_INFO(rhelversion, "7.5");
 #ifdef RETPOLINE
 	MODULE_INFO(retpoline, "Y");
