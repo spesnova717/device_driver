@@ -173,6 +173,8 @@ ssize_t fpga_read(struct file *filePtr, char __user *buf, size_t count, loff_t *
 	up(&devInfo->sem);
 	return bytesDone;
 }
+
+/*
 ssize_t fpga_write(struct file *filePtr, const char __user *buf, size_t count, loff_t *pos){
 	struct DevInfo_t * devInfo = (struct DevInfo_t *) filePtr->private_data;
 	//Read the command from the buffer
@@ -206,6 +208,52 @@ ssize_t fpga_write(struct file *filePtr, const char __user *buf, size_t count, l
         printk(KERN_INFO "[FPGA] count_write.\n");
 		//Then into the device
 		memcpy_toio(startAddr + bytesDone, devInfo->buffer, bytesToTransfer);
+		
+		bytesDone += bytesToTransfer;
+		count -= bytesToTransfer;
+	}
+	up(&devInfo->sem);
+	return bytesDone;
+}
+*/
+int data[1048576];
+ssize_t fpga_write(struct file *filePtr, const char __user *buf, size_t count, loff_t *pos){
+	struct DevInfo_t * devInfo = (struct DevInfo_t *) filePtr->private_data;
+	//Read the command from the buffer
+	struct IOCmd_t iocmd; 
+	void * startAddr;
+
+	size_t bytesDone = 0;
+	size_t bytesToTransfer = 0;
+
+	printk(KERN_INFO "[FPGA] write: Entering function.\n");
+
+	if (down_interruptible(&devInfo->sem)) {
+		printk(KERN_WARNING "[FPGA] write: Unable to get semaphore!\n");
+		return -1;
+	}
+
+	/////copy_from_user(&iocmd, (void __user *) buf, sizeof(iocmd));	
+
+	//Map the device address to the iomaped memory
+	/////startAddr = (void*) (devInfo->bar[iocmd.barNum] + iocmd.devAddr) ;
+	startAddr = (void*) (devInfo->bar[iocmd.barNum] + *pos);
+
+	printk(KERN_INFO "[FPGA] write: Writing %u bytes from user address 0x%p \
+			to device address %u.\n", \
+			(unsigned int) count, iocmd.userAddr, iocmd.devAddr);
+
+	while (count > 0){
+		bytesToTransfer = (count > BUFFER_SIZE) ? BUFFER_SIZE : count;
+
+		//First copy from user to buffer
+		/////copy_from_user(devInfo->buffer, iocmd.userAddr + bytesDone, bytesToTransfer);
+		copy_from_user(data, buf + bytesDone, bytesToTransfer);
+
+        printk(KERN_INFO "[FPGA] count_write.\n");
+		//Then into the device
+		/////memcpy_toio(startAddr + bytesDone, devInfo->buffer, bytesToTransfer);
+		memcpy_toio(startAddr + bytesDone, data, bytesToTransfer);
 		
 		bytesDone += bytesToTransfer;
 		count -= bytesToTransfer;

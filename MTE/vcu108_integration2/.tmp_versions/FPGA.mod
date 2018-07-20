@@ -1,2 +1,2 @@
-/root/device_driver/MTE/vcu108_integration/FPGA.ko
-/root/device_driver/MTE/vcu108_integration/FPGA.o
+/root/device_driver/MTE/vcu108_integration2/FPGA.ko
+/root/device_driver/MTE/vcu108_integration2/FPGA.o
