@@ -135,18 +135,36 @@ for(j=0;j<1;j++){
 }
 
 //int main(int argc, char const* argv[])
+#define mDATA 65536
+int receive_data[mDATA];
+int data[mDATA];
 int main()
 {
 	int fd;
-	int receive_data[100];
-  int data[10];
-  data[0] = 0x22222222;
+  int i;
+	//int receive_data[mDATA];
+  //int data[mDATA];
+  double temporary_write;
+
+  for(i=0;i<mDATA;i++){
+    data[i] = i;
+    receive_data[i] = 0x0;
+  }
+
 	fd = open_device(DEVFILE);
 	lseek(fd, 0, SEEK_SET);
-	write(fd, data, 40);
-	//read(fd, receive_data, 4);
-	//printf("receive_data = 0x%d\n",receive_data[0]);
+  start_time_write = gettimeofday_sec();
+	write(fd, data, mDATA);
+  end_time_write = gettimeofday_sec();
+  lseek(fd, 0, SEEK_SET);
+	read(fd, receive_data, mDATA);
+
+  for(i=0;i<mDATA/4;i++){
+    //printf("receive_data = 0x%lx\n",receive_data[i]);
+  }
 	//mmio_test(fd);
+   temporary_write = mDATA / (end_time_write - start_time_write) / 1000000;
+   printf("Write = %8lf[MB/s]\n",temporary_write);
 	close_device(fd);	
 	
 	return 0;
