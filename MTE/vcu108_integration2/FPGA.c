@@ -34,6 +34,7 @@ struct file_operations fileOps = {
 	.write =    fpga_write,
 	.open =     fpga_open,
 	.release =  fpga_close,
+	.llseek = 	fpga_llseek,
 };
 
 
@@ -82,54 +83,6 @@ void __iomem *pci_iomap_wc(struct pci_dev *dev, int bar, unsigned long maxlen)
   return pci_iomap_wc_range(dev, bar, 0, maxlen);
 }
 
-//#################################
-
-
-	
-//#################################
-/*
-ssize_t rw_dispatcher(struct file *filePtr, char __user *buf, size_t count, bool rwFlag){
-
-
-
-	printk(KERN_INFO "[FPGA] rw_dispatcher: Entering function.\n");
-
-	if (down_interruptible(&devInfo->sem)) {
-		printk(KERN_WARNING "[FPGA] rw_dispatcher: Unable to get semaphore!\n");
-		return -1;
-	}
-
-	copy_from_user(&iocmd, (void __user *) buf, sizeof(iocmd));
-
-	//Map the device address to the iomaped memory
-	startAddr = (void*) (devInfo->bar[iocmd.barNum] + iocmd.devAddr) ;
-
-	printk(KERN_INFO "[FPGA] rw_dispatcher: Reading/writing %u bytes from user address 0x%p to device address %u.\n", (unsigned int) count, iocmd.userAddr, iocmd.devAddr);
-	while (count > 0){
-		bytesToTransfer = (count > BUFFER_SIZE) ? BUFFER_SIZE : count;
-
-
-		if (rwFlag) {
-			//First read from device into kernel memory 
-			memcpy_fromio(devInfo->buffer, startAddr + bytesDone, bytesToTransfer);
-      printk(KERN_INFO "[FPGA] count_read.\n");
-			//Then into user space
-			copy_to_user(iocmd.userAddr + bytesDone, devInfo->buffer, bytesToTransfer);
-		}
-		else{
-			//First copy from user to buffer
-			copy_from_user(devInfo->buffer, iocmd.userAddr + bytesDone, bytesToTransfer);
-      printk(KERN_INFO "[FPGA] count_write.\n");
-			//Then into the device
-			memcpy_toio(startAddr + bytesDone, devInfo->buffer, bytesToTransfer);
-		}
-		bytesDone += bytesToTransfer;
-		count -= bytesToTransfer;
-	}
-	up(&devInfo->sem);
-	return bytesDone;
-}
-*/
 int fpga_open(struct inode *inode, struct file *filePtr) {
 	//Get a handle to our devInfo and store it in the file handle
 	struct DevInfo_t * devInfo = 0;
@@ -261,6 +214,31 @@ ssize_t fpga_write(struct file *filePtr, const char __user *buf, size_t count, l
 	return bytesDone;
 }
 
+loff_t fpga_llseek(struct file *filp, loff_t off, int whence) {
+        loff_t newpos =-1;
+        #ifdef DETAIL_LOG
+        //tprintk("lseek whence:%d\n", whence);
+        #endif
+        switch(whence) {
+        
+        case SEEK_SET:
+                newpos = off;
+        break;
+
+        case SEEK_CUR:
+                newpos = filp->f_pos + off;
+        break;
+
+        default:
+                return -EINVAL;
+        }
+
+        if (newpos < 0) return -EINVAL;
+
+        filp->f_pos = newpos;
+        return newpos;
+}
+
 static int setup_chrdev(struct DevInfo_t *devInfo){
 	/*
 	Setup the /dev/deviceName to allow user programs to read/write to the driver.
@@ -349,55 +327,12 @@ static int unmap_bars(struct DevInfo_t * devInfo){
 	return 0;
 }
 
-static int print_timestamp() {
+/* static int print_timestamp() {
     struct timespec time;
  
     getnstimeofday(&time);
     return time.tv_sec * 1000000000L + time.tv_nsec;
-}
-
-int start_read;
-int start_write;
-int end_read;
-int end_write;
-int val[16384];
-/*
-int val0[1024];
-int val1[1024];
-int val2[1024];
-int val3[1024];
-int val4[1024];
-int val5[1024];
-int val6[1024];
-int val7[1024];
-int val8[1024];
-int val9[1024];
-int val10[1024];
-int val11[1024];
-int val12[1024];
-int val13[1024];
-int val14[1024];
-int val15[1024];
-*/
-int val_res[16384];
-/*
-int val_res0[1024];
-int val_res1[1024];
-int val_res2[1024];
-int val_res3[1024];
-int val_res4[1024];
-int val_res5[1024];
-int val_res6[1024];
-int val_res7[1024];
-int val_res8[1024];
-int val_res9[1024];
-int val_res10[1024];
-int val_res11[1024];
-int val_res12[1024];
-int val_res13[1024];
-int val_res14[1024];
-int val_res15[1024];
-*/
+} */
 
 static int probe(struct pci_dev *dev, const struct pci_device_id *id) {
 		/*
@@ -450,127 +385,6 @@ static int probe(struct pci_dev *dev, const struct pci_device_id *id) {
 		//TODO: proper error catching and memory releasing
 		sema_init(&devInfo->sem, 1);
 
-		//int val[2048];
-		//int val_res[2048];
-		int t;
-		
-    // * Kenel Dump
-    for(t=0;t<16384;t++){
-      val[t] = 0x12345678;
-      /*
-			val0[t] = 0x12345678;
-      val1[t] = 0x12345678;
-      val2[t] = 0x12345678;
-      val3[t] = 0x12345678;
-      val4[t] = 0x12345678;
-      val5[t] = 0x12345678;
-      val6[t] = 0x12345678;
-      val7[t] = 0x12345678;
-      val8[t] = 0x12345678;
-      val9[t] = 0x12345678;
-      val10[t] = 0x12345678;
-      val11[t] = 0x12345678;
-      val12[t] = 0x12345678;
-      val13[t] = 0x12345678;
-      val14[t] = 0x12345678;
-      val15[t] = 0x12345678;
-      */
-      //val_res[t] = 0;
-		}
-    
-    ///val[16383] = 0x87654321;
-    val[1023] = 0x87654321;
-    /*
-    val0[1023] = 0x00000000;
-    val1[1023] = 0x00000001;
-    val2[1023] = 0x00000002;
-    val3[1023] = 0x00000003;
-    val4[1023] = 0x00000004;
-    val5[1023] = 0x00000005;
-    val6[1023] = 0x00000006;
-    val7[1023] = 0x00000007;
-    val8[1023] = 0x00000008;
-    val9[1023] = 0x00000009;
-    val10[1023] = 0x00000010;
-    val11[1023] = 0x00000011;
-    val12[1023] = 0x00000012;
-    val13[1023] = 0x00000013;
-    val14[1023] = 0x00000014;
-    val15[1023] = 0x00000015;
-    */
-    for(t=0;t<10;t++){
-    start_write = print_timestamp();
-		///memcpy_toio(devInfo->bar[0], val, 65536);
-    memcpy_toio(devInfo->bar[0], val, 4096);
-    /*
-    memcpy_toio(devInfo->bar[0], val1, 4096);
-    memcpy_toio(devInfo->bar[0], val2, 4096);
-    memcpy_toio(devInfo->bar[0], val3, 4096);
-    memcpy_toio(devInfo->bar[0], val4, 4096);
-    memcpy_toio(devInfo->bar[0], val5, 4096);
-    memcpy_toio(devInfo->bar[0], val6, 4096);
-    memcpy_toio(devInfo->bar[0], val7, 4096);
-    memcpy_toio(devInfo->bar[0], val8, 4096);
-    memcpy_toio(devInfo->bar[0], val9, 4096);
-    memcpy_toio(devInfo->bar[0], val10, 4096);
-    memcpy_toio(devInfo->bar[0], val11, 4096);
-    memcpy_toio(devInfo->bar[0], val12, 4096);
-    memcpy_toio(devInfo->bar[0], val13, 4096);
-    memcpy_toio(devInfo->bar[0], val14, 4096);
-    memcpy_toio(devInfo->bar[0], val15, 4096);
-    */
-    wmb();
-    end_write = print_timestamp();
-
-    start_read = print_timestamp();
-		///memcpy_fromio(val_res, devInfo->bar[0], 65536);
-    memcpy_fromio(val_res, devInfo->bar[0], 4096);
-    /*
-    memcpy_fromio(val_res1, devInfo->bar[0], 4096);
-    memcpy_fromio(val_res2, devInfo->bar[0], 4096);
-    memcpy_fromio(val_res3, devInfo->bar[0], 4096);
-    memcpy_fromio(val_res4, devInfo->bar[0], 4096);
-    memcpy_fromio(val_res5, devInfo->bar[0], 4096);
-    memcpy_fromio(val_res6, devInfo->bar[0], 4096);
-    memcpy_fromio(val_res7, devInfo->bar[0], 4096);
-    memcpy_fromio(val_res8, devInfo->bar[0], 4096);
-    memcpy_fromio(val_res9, devInfo->bar[0], 4096);
-    memcpy_fromio(val_res10, devInfo->bar[0], 4096);
-    memcpy_fromio(val_res11, devInfo->bar[0], 4096);
-    memcpy_fromio(val_res12, devInfo->bar[0], 4096);
-    memcpy_fromio(val_res13, devInfo->bar[0], 4096);
-    memcpy_fromio(val_res14, devInfo->bar[0], 4096);
-    memcpy_fromio(val_res15, devInfo->bar[0], 4096);
-    */
-    rmb();
-    end_read = print_timestamp();
-
-    printk("val0_1022 = 0x%lx\n",val_res[1022]);
-    printk("val0_1023 = 0x%lx\n",val_res[1023]);
-    ///printk("val_16382 = 0x%lx\n",val_res[16382]);
-    ///printk("val_16383 = 0x%lx\n",val_res[16383]);
-
-    printk("write = %d\n",end_write - start_write);
-    printk("read = %d\n",end_read - start_read);
-    }
-/*
-    val[1023] = 0x11111111;
-    start_write = print_timestamp();
-    for (t = 0; t < 1024; t++) {
-      iowrite32(val[t],devInfo->bar[0] + t*4);
-    
-    }
-    end_write = print_timestamp();
-
-    start_read = print_timestamp();
-      for (t = 0; t < 1024; t++) {
-        val_res[t] = ioread32(devInfo->bar[0] + t*4);
-      }
-    end_read = print_timestamp();
-    printk("io = 0x%lx\n",val_res[1023]);
-    printk("write = %d\n",end_write - start_write);
-    printk("read = %d\n",end_read - start_read);
-*/
 		return 0;
 
 }

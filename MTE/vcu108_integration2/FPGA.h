@@ -20,7 +20,7 @@ int fpga_open(struct inode *inode, struct file *file);
 int fpga_close(struct inode *inode, struct file *file);
 ssize_t fpga_read(struct file *file, char __user *buf, size_t count, loff_t *pos);
 ssize_t fpga_write(struct file *file, const char __user *buf, size_t count, loff_t *pos);
-
+loff_t fpga_llseek(struct file *filp, loff_t off, int whence);
 
 /* Maximum size of driver buffer (allocated with kalloc()).
  * Needed to copy data from user to kernel space */
