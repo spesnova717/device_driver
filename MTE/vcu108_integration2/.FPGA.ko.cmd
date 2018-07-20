@@ -1,0 +1,1 @@
+cmd_/root/device_driver/MTE/vcu108_integration/FPGA.ko := ld -r -m elf_x86_64 -T ./scripts/module-common.lds --build-id  -o /root/device_driver/MTE/vcu108_integration/FPGA.ko /root/device_driver/MTE/vcu108_integration/FPGA.o /root/device_driver/MTE/vcu108_integration/FPGA.mod.o
