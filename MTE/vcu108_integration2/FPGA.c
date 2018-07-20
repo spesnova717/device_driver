@@ -1,6 +1,7 @@
 // Author: spesnova717
 
 #include "FPGA.h"
+#define tprintk(fmt, ...) printk(KERN_ALERT "** (%3d) %-20s: " fmt, __LINE__,  __func__,  ## __VA_ARGS__)
 
 
 MODULE_LICENSE("TUS Lab");
@@ -249,6 +250,7 @@ ssize_t fpga_write(struct file *filePtr, const char __user *buf, size_t count, l
 		//First copy from user to buffer
 		/////copy_from_user(devInfo->buffer, iocmd.userAddr + bytesDone, bytesToTransfer);
 		copy_from_user(data, buf + bytesDone, bytesToTransfer);
+		printk(KERN_INFO "[FPGA] count_write=%lx\n",data[0]);
 
         printk(KERN_INFO "[FPGA] count_write.\n");
 		//Then into the device
@@ -264,9 +266,9 @@ ssize_t fpga_write(struct file *filePtr, const char __user *buf, size_t count, l
 
 loff_t fpga_llseek(struct file *filp, loff_t off, int whence) {
         loff_t newpos =-1;
-        #ifdef DETAIL_LOG
-        //tprintk("lseek whence:%d\n", whence);
-        #endif
+        //#ifdef DETAIL_LOG
+        printk("lseek whence:%d\n", whence);
+        //#endif
         switch(whence) {
         
         case SEEK_SET:

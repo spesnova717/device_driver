@@ -55,7 +55,7 @@ __attribute__((section(".modinfo"))) =
 
 MODULE_ALIAS("pci:v000010EEd00008038sv*sd*bc*sc*i*");
 
-MODULE_INFO(srcversion, "57D54AD4BBE0AED58BDD4B3");
+MODULE_INFO(srcversion, "77BC6EF080DA03DDE807780");
 MODULE_INFO(rhelversion, "7.5");
 #ifdef RETPOLINE
 	MODULE_INFO(retpoline, "Y");
