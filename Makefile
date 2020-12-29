@@ -3,12 +3,8 @@ obj-m := driver.o
 
 all:
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules
-	cc     user.c   -o user
-
-install: all
-	install -m 644 virtex-7.rules /etc/udev/rules.d
+#	cc     user.c   -o user
 
 clean:
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean
-	rm -f user
-	rm -rf *.o *.o.d *~ core .depend .*.cmd *.ko *.ko.unsigned *.mod.c .tmp_versions *.symvers .#* *.save *.bak Modules.* modules.order Module.markers *.bin
+#	rm -f user

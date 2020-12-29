@@ -1,4 +1,3 @@
-//y
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/types.h>
@@ -17,16 +16,19 @@
 
 #define BAR_MMIO 0
 #define VENDOR_ID 0x10ee
+//#define VENDOR_ID 0x1bc8
 #define DEVICE_ID 0x7028
-
+//#define DEVICE_ID 0x8038
+//#define DEVICE_ID 0x1096
 MODULE_LICENSE("Dual BSD/GPL");
-MODULE_AUTHOR("MasudaLab");
+MODULE_AUTHOR("spesnova717");
 MODULE_DESCRIPTION("device driver for pci");
+
 #define DRIVER_NAME "Virtex-7"
 #define DEVICE_NAME "Virtex-7_XC7VX485T-2FFG1761C"
 
-#define DETAIL_LOG
 #define PCI_DRIVER_DEBUG
+#define DETAIL_LOG
 #ifdef  PCI_DRIVER_DEBUG
 #define tprintk(fmt, ...) printk(KERN_ALERT "** (%3d) %-20s: " fmt, __LINE__,  __func__,  ## __VA_ARGS__)
 #else
@@ -34,35 +36,32 @@ MODULE_DESCRIPTION("device driver for pci");
 #endif
 
 // 時間計測
+/*
 static int print_timestamp() {
     struct timespec time;
  
     getnstimeofday(&time);
     return time.tv_sec * 1000000000L + time.tv_nsec;
 }
-
+*/
 int start_read;
 int start_write;
 int end_read;
 int end_write;
 
-int  data[1048576]; 
+int data[1048576]; 
 int value[1048576];
 // max device count (マイナー番号)
 static int pci_devs_max = 1;
-
 // pci_major = 0 ならば動的に割り当てられる
 static unsigned int pci_major = 246;
-
 // insmodした時に，pci_majorをコンソール上で得ることができる
 module_param(pci_major, uint, 0);
-
-static unsigned int pci_minor = 0; //static allocation
-static dev_t pci_devt; //MKDEV(pci_major, pci_minor)
+static unsigned int pci_minor = 0; // static allocation
+static dev_t pci_devt; // MKDEV(pci_major, pci_minor)
 struct device_data {
         struct pci_dev *pdev;
         struct cdev *cdev;
-
         // for PCI mmio
         unsigned long mmio_base, mmio_flags, mmio_length;
         char *mmio_addr;
@@ -78,24 +77,25 @@ ssize_t pci_write(struct file *filp, const char __user *buf, size_t count, loff_
         copy_from_user(data, buf, count);
         for (i = 0; i < count/4; i++) {
                 iowrite32(data[i], dev_data->mmio_addr + *f_ops + i*4);
-        #ifdef DETAIL_LOG
-        tprintk("write : %d\n", i);
-        #endif
-        }              
+		        wmb();
+        }
+	return count;              
 }
 
 ssize_t pci_read(struct file *filp, char __user *buf, size_t count, loff_t *f_ops) {
         int i;
         for(i=0; i<count/4; i++) {
-		value[i] = ioread32(dev_data->mmio_addr+ *f_ops + i*4);
+		    value[i] = ioread32(dev_data->mmio_addr+ *f_ops + i*4);
+		      rmb();
         }
         copy_to_user(buf, value, count);
+	return count;
 }
 
 loff_t pci_llseek(struct file *filp, loff_t off, int whence) {
         loff_t newpos =-1;
         #ifdef DETAIL_LOG
-        tprintk("lseek whence:%d\n", whence);
+        //tprintk("lseek whence:%d\n", whence);
         #endif
         switch(whence) {
         
@@ -156,7 +156,7 @@ static int pci_probe (struct pci_dev *pdev, const struct pci_device_id *id) {
         char irq;
         int alloc_ret = 0;
         int cdev_err = 0;
-        //u16 vendor_id, device_id;
+        short vendor_id, device_id;
 
         // config PCI
         // enable pci device
@@ -174,15 +174,21 @@ static int pci_probe (struct pci_dev *pdev, const struct pci_device_id *id) {
         dev_data->mmio_base = pci_resource_start(pdev, BAR_MMIO);
         dev_data->mmio_length = pci_resource_len(pdev, BAR_MMIO);
         dev_data->mmio_flags = pci_resource_flags(pdev, BAR_MMIO);
-        tprintk("mmio_base  : 0x%lx\n", dev_data->mmio_base);
-        tprintk("mmio_length: 0x%lx\n", dev_data->mmio_length);
-        tprintk("mmio_flags : 0x%lx\n", dev_data->mmio_flags);
+        tprintk( "mmio_base: %lx, mmio_length: %lx, mmio_flags: %lx\n",
+                        dev_data->mmio_base, dev_data->mmio_length, dev_data->mmio_flags);
 
-        dev_data->mmio_addr = ioremap(dev_data->mmio_base, dev_data->mmio_length);
-	tprintk("virtex7: Mapped Address Start -> (0x%llx)\n",(unsigned long long)dev_data->mmio_addr);
-        tprintk("virtex7: Mapped Address End   -> (0x%llx)\n",(unsigned long long)dev_data->mmio_length + 
-                                                (unsigned long long)dev_data->mmio_addr);
-        tprintk("virtex7: Mapped Memory Size   -> (0x%llx)\n",(unsigned long long)dev_data->mmio_length);
+        //burst read/write
+        dev_data->mmio_addr = ioremap_wc(dev_data->mmio_base, dev_data->mmio_length);
+	      
+        //normal type
+        //dev_data->mmio_addr = ioremap(dev_data->mmio_base, dev_data->mmio_length);
+        
+        //no cache type
+        //dev_data->mmio_addr = ioremap_nocache(dev_data->mmio_base, dev_data->mmio_length);
+        
+        tprintk("virtex7: Mapped Address -> (0x%llx)\n",(unsigned long long)dev_data->mmio_addr);
+	      tprintk("virtex7: Mapped Memory -> (0x%llx)\n",(unsigned long long)dev_data->mmio_length);
+        tprintk("virtex7: Mapped Addr End -> (0x%llx)\n",(unsigned long long)dev_data->mmio_length + (unsigned long long)dev_data->mmio_addr);
 
         err = pci_request_region(pdev, BAR_MMIO, DRIVER_NAME);
         if(err) {
@@ -192,9 +198,9 @@ static int pci_probe (struct pci_dev *pdev, const struct pci_device_id *id) {
 
         // PCI configuration data　の探索
         // define at include/uapi/linux/pci_regs.h
-        //pci_read_config_word(pdev, VENDOR_ID, &vendor_id);
-        //pci_read_config_word(pdev, DEVICE_ID, &device_id);
-        tprintk("PCI Vendor ID:%X, Device ID:%X\n", VENDOR_ID, DEVICE_ID);
+        pci_read_config_word(pdev, VENDOR_ID, &vendor_id);
+        pci_read_config_word(pdev, DEVICE_ID, &device_id);
+        tprintk("PCI Vendor ID:%X, Device ID:%X\n", vendor_id, device_id);
 
         dev_data->pdev = pdev;
         //dev_data->mmio_memsize = MMIO_DATASIZE;
@@ -228,6 +234,7 @@ static int pci_probe (struct pci_dev *pdev, const struct pci_device_id *id) {
         tprintk("%s driver(major %d) installed.\n", DRIVER_NAME, pci_major);
 
         pci_set_master(pdev);   //For DMA.
+
         return 0;
 
 error:
